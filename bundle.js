@@ -291,10 +291,16 @@
     // objects we'll be drawing.
     const buffers = initBuffers(gl);
 
+    // Draw the scene
+    var then = 0;
+
     // Draw the scene repeatedly
     function render(now) {
+      now *= 0.001;  // convert to seconds
+      const deltaTime = now - then;
+      then = now;
 
-      drawScene(gl, programInfo, buffers);
+      drawScene(gl, programInfo, buffers, deltaTime);
 
       requestAnimationFrame(render);
     }
@@ -438,7 +444,7 @@
     // and we only want to see objects between 0.1 units
     // and 100 units away from the camera.
 
-    const fieldOfView = 45 * Math.PI / 180;   // in radians
+    const fieldOfView = 50 * Math.PI / 280;   // in radians
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     const zNear = 0.1;
     const zFar = 100.0;
@@ -464,7 +470,15 @@
                    [-0.0, 0.0, -6.0]);  // amount to translate
 
 
-    rotate(modelViewMatrix, modelViewMatrix, cubeRotation * .7, [0, 1, 0]);
+    rotate(modelViewMatrix,  // destination matrix
+                modelViewMatrix,  // matrix to rotate
+                cubeRotation,     // amount to rotate in radians
+                [0, 0, 1]);       // axis to rotate around (Z)
+    rotate(modelViewMatrix,  // destination matrix
+                modelViewMatrix,  // matrix to rotate
+                cubeRotation * .7,// amount to rotate in radians
+                [0, 1, 0]);       // axis to rotate around (X)
+
 
     // Tell WebGL how to pull out the positions from the position
     // buffer into the vertexPosition attribute
@@ -529,6 +543,9 @@
       const offset = 0;
       gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
     }
+    // Update the rotation for the next draw
+
+    cubeRotation += deltaTime;
   }
 
   //
