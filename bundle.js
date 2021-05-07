@@ -55,6 +55,119 @@
     return out;
   }
   /**
+   * Transpose the values of a mat4
+   *
+   * @param {mat4} out the receiving matrix
+   * @param {ReadonlyMat4} a the source matrix
+   * @returns {mat4} out
+   */
+
+  function transpose(out, a) {
+    // If we are transposing ourselves we can skip a few steps but have to cache some values
+    if (out === a) {
+      var a01 = a[1],
+          a02 = a[2],
+          a03 = a[3];
+      var a12 = a[6],
+          a13 = a[7];
+      var a23 = a[11];
+      out[1] = a[4];
+      out[2] = a[8];
+      out[3] = a[12];
+      out[4] = a01;
+      out[6] = a[9];
+      out[7] = a[13];
+      out[8] = a02;
+      out[9] = a12;
+      out[11] = a[14];
+      out[12] = a03;
+      out[13] = a13;
+      out[14] = a23;
+    } else {
+      out[0] = a[0];
+      out[1] = a[4];
+      out[2] = a[8];
+      out[3] = a[12];
+      out[4] = a[1];
+      out[5] = a[5];
+      out[6] = a[9];
+      out[7] = a[13];
+      out[8] = a[2];
+      out[9] = a[6];
+      out[10] = a[10];
+      out[11] = a[14];
+      out[12] = a[3];
+      out[13] = a[7];
+      out[14] = a[11];
+      out[15] = a[15];
+    }
+
+    return out;
+  }
+  /**
+   * Inverts a mat4
+   *
+   * @param {mat4} out the receiving matrix
+   * @param {ReadonlyMat4} a the source matrix
+   * @returns {mat4} out
+   */
+
+  function invert(out, a) {
+    var a00 = a[0],
+        a01 = a[1],
+        a02 = a[2],
+        a03 = a[3];
+    var a10 = a[4],
+        a11 = a[5],
+        a12 = a[6],
+        a13 = a[7];
+    var a20 = a[8],
+        a21 = a[9],
+        a22 = a[10],
+        a23 = a[11];
+    var a30 = a[12],
+        a31 = a[13],
+        a32 = a[14],
+        a33 = a[15];
+    var b00 = a00 * a11 - a01 * a10;
+    var b01 = a00 * a12 - a02 * a10;
+    var b02 = a00 * a13 - a03 * a10;
+    var b03 = a01 * a12 - a02 * a11;
+    var b04 = a01 * a13 - a03 * a11;
+    var b05 = a02 * a13 - a03 * a12;
+    var b06 = a20 * a31 - a21 * a30;
+    var b07 = a20 * a32 - a22 * a30;
+    var b08 = a20 * a33 - a23 * a30;
+    var b09 = a21 * a32 - a22 * a31;
+    var b10 = a21 * a33 - a23 * a31;
+    var b11 = a22 * a33 - a23 * a32; // Calculate the determinant
+
+    var det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+
+    if (!det) {
+      return null;
+    }
+
+    det = 1.0 / det;
+    out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
+    out[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+    out[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
+    out[3] = (a22 * b04 - a21 * b05 - a23 * b03) * det;
+    out[4] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
+    out[5] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+    out[6] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
+    out[7] = (a20 * b05 - a22 * b02 + a23 * b01) * det;
+    out[8] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+    out[9] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+    out[10] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
+    out[11] = (a21 * b02 - a20 * b04 - a23 * b00) * det;
+    out[12] = (a11 * b07 - a10 * b09 - a12 * b06) * det;
+    out[13] = (a00 * b09 - a01 * b07 + a02 * b06) * det;
+    out[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det;
+    out[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
+    return out;
+  }
+  /**
    * Translate a mat4 by the given vector
    *
    * @param {mat4} out the receiving matrix
@@ -248,16 +361,30 @@
 
     const vsSource = `
     attribute vec4 aVertexPosition;
+    attribute vec3 aVertexNormal;
     attribute vec2 aTextureCoord;
 
+    uniform mat4 uNormalMatrix;
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
 
     varying highp vec2 vTextureCoord;
+    varying highp vec3 vLighting;
 
     void main(void) {
       gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
       vTextureCoord = aTextureCoord;
+
+      // Apply lighting effect
+
+      highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
+      highp vec3 directionalLightColor = vec3(1, 1, 1);
+      highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
+
+      highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+
+      highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+      vLighting = ambientLight + (directionalLightColor * directional);
     }
   `;
 
@@ -265,11 +392,14 @@
 
     const fsSource = `
     varying highp vec2 vTextureCoord;
+    varying highp vec3 vLighting;
 
     uniform sampler2D uSampler;
 
     void main(void) {
-      gl_FragColor = texture2D(uSampler, vTextureCoord);
+      highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+
+      gl_FragColor = vec4(texelColor.rgb * vLighting, texelColor.a);
     }
   `;
 
@@ -285,11 +415,13 @@
       program: shaderProgram,
       attribLocations: {
         vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+        vertexNormal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
         textureCoord: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
       },
       uniformLocations: {
         projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
         modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+        normalMatrix: gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
         uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
       },
     };
@@ -443,10 +575,58 @@
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
         new Uint16Array(indices), gl.STATIC_DRAW);
 
+
+    // Init lightnings
+
+    const normalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+
+    const vertexNormals = [
+      // Front
+      0.0,  0.0,  1.0,
+      0.0,  0.0,  1.0,
+      0.0,  0.0,  1.0,
+      0.0,  0.0,  1.0,
+
+      // Back
+      0.0,  0.0, -1.0,
+      0.0,  0.0, -1.0,
+      0.0,  0.0, -1.0,
+      0.0,  0.0, -1.0,
+
+      // Top
+      0.0,  1.0,  0.0,
+      0.0,  1.0,  0.0,
+      0.0,  1.0,  0.0,
+      0.0,  1.0,  0.0,
+
+      // Bottom
+      0.0, -1.0,  0.0,
+      0.0, -1.0,  0.0,
+      0.0, -1.0,  0.0,
+      0.0, -1.0,  0.0,
+
+      // Right
+      1.0,  0.0,  0.0,
+      1.0,  0.0,  0.0,
+      1.0,  0.0,  0.0,
+      1.0,  0.0,  0.0,
+
+      // Left
+      -1.0,  0.0,  0.0,
+      -1.0,  0.0,  0.0,
+      -1.0,  0.0,  0.0,
+      -1.0,  0.0,  0.0
+    ];
+
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals),
+        gl.STATIC_DRAW);
+
     return {
       position: positionBuffer,
       textureCoord: textureCoordBuffer,
       indices: indexBuffer,
+      normal: normalBuffer,
     };
   }
 
@@ -570,6 +750,36 @@
       const offset = 0;
       gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
     }
+
+    const normalMatrix = create();
+    invert(normalMatrix, modelViewMatrix);
+    transpose(normalMatrix, normalMatrix);
+
+    gl.uniformMatrix4fv(
+        programInfo.uniformLocations.normalMatrix,
+        false,
+        normalMatrix);
+
+    // Tell WebGL how to pull out the normals from
+    // the normal buffer into the vertexNormal attribute.
+    {
+      const numComponents = 3;
+      const type = gl.FLOAT;
+      const normalize = false;
+      const stride = 0;
+      const offset = 0;
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.normal);
+      gl.vertexAttribPointer(
+          programInfo.attribLocations.vertexNormal,
+          numComponents,
+          type,
+          normalize,
+          stride,
+          offset);
+      gl.enableVertexAttribArray(
+          programInfo.attribLocations.vertexNormal);
+    }
+
     // Update the rotation for the next draw
 
     cubeRotation += deltaTime;
